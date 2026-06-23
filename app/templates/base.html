@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}EGL Nurture Signal{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">📡 EGL Nurture Signal</a>
+    <nav>
+      <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Biblioteca</a>
+      <a href="/recommend" class="{% if request.url.path == '/recommend' %}active{% endif %}">Recomendar</a>
+      <a href="/links" class="{% if request.url.path.startswith('/links') %}active{% endif %}">Links</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+    {% if err %}<div class="flash error">{{ err }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    EGL Nurture Signal · prescribe el vídeo correcto a cada lead y mide la señal de interés.
+  </footer>
+</body>
+</html>

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}{{ video.title }} · Biblioteca{% endblock %}
+{% block content %}
+
+<a class="back" href="/">← Biblioteca</a>
+
+<div class="detail">
+  <div class="detail-main">
+    <div class="vid-head">
+      {% if video.thumbnail_url %}<img class="thumb" src="{{ video.thumbnail_url }}" alt="">{% endif %}
+      <div>
+        <span class="badge status-{{ video.status }}">{{ video.status.replace('_',' ') }}</span>
+        <h1>{{ video.title or video.youtube_video_id }}</h1>
+        <p class="muted">{{ video.channel_name or '—' }} · {{ video.duration_label }} ·
+          publicado {{ video.published_at|dt }}</p>
+        <a class="ext" href="{{ video.youtube_url }}" target="_blank" rel="noopener">Ver en YouTube ↗</a>
+      </div>
+    </div>
+
+    <form method="post" action="/videos/{{ video.id }}/update" class="card-form">
+      <h2>Clasificación comercial</h2>
+      <label>Resumen comercial
+        <textarea name="summary" rows="3">{{ video.summary }}</textarea>
+      </label>
+      <div class="row">
+        <label>Fase del embudo
+          <input type="text" name="stage" value="{{ video.stage or '' }}" placeholder="pre-call / post-call / nurturing / reactivación">
+        </label>
+        <label>Dolor principal
+          <input type="text" name="pain_category" value="{{ video.pain_category or '' }}">
+        </label>
+      </div>
+      <label>Caso de uso (¿a quién y cuándo se manda?)
+        <textarea name="use_case" rows="2">{{ video.use_case }}</textarea>
+      </label>
+      <label>URL de redirect (guárdala tal cual; puede llevar <code>&list=</code> de playlist)
+        <input type="text" name="youtube_url" value="{{ video.youtube_url }}">
+      </label>
+
+      <h3>Etiquetas {% if video.tags %}<small>(marca las que apruebas)</small>{% endif %}</h3>
+      {% if video.tags %}
+      <div class="tag-checks">
+        {% for vt in video.tags %}
+        <label class="tag-check {% if vt.approved %}checked{% endif %}">
+          <input type="checkbox" name="approved_tag" value="{{ vt.id }}" {% if vt.approved %}checked{% endif %}>
+          <span class="tag {{ vt.tag.type }}">{{ vt.tag.label }}</span>
+          <small>{{ (vt.confidence*100)|round|int }}% · {{ vt.source }}</small>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">Sin etiquetas todavía.</p>
+      {% endif %}
+
+      <div class="add-tag">
+        <input type="text" name="new_tag_name" placeholder="Añadir etiqueta…">
+        <select name="new_tag_type">
+          <option value="">tipo</option>
+          {% for t in tag_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="primary">Guardar cambios</button>
+    </form>
+
+    {% if video.transcript %}
+    <details class="transcript">
+      <summary>Transcripción ({{ video.transcript_lang or '?' }} · {{ video.transcript|length }} caracteres)</summary>
+      <p>{{ video.transcript }}</p>
+    </details>
+    {% else %}
+    <p class="muted small">No se encontró transcripción para este vídeo (clasificado por título + descripción).</p>
+    {% endif %}
+  </div>
+
+  <aside class="detail-side">
+    <div class="side-card">
+      <h3>Estado</h3>
+      <form method="post" action="/videos/{{ video.id }}/status" class="status-actions">
+        {% if video.status != 'active' %}
+        <button name="status" value="active" class="primary">✓ Activar (usable)</button>
+        {% endif %}
+        {% if video.status != 'archived' %}
+        <button name="status" value="archived" class="ghost">Archivar</button>
+        {% endif %}
+        {% if video.status != 'pending_review' %}
+        <button name="status" value="pending_review" class="ghost">Volver a revisión</button>
+        {% endif %}
+      </form>
+      <p class="hint small">Solo los vídeos <b>activos</b> entran en el recomendador.</p>
+    </div>
+
+    <div class="side-card">
+      <h3>Generar link para un lead</h3>
+      <form method="post" action="/links">
+        <input type="hidden" name="video_id" value="{{ video.id }}">
+        <input type="text" name="setter_name" value="{{ default_setter }}" placeholder="Setter (con quién habló, p.ej. Laura)">
+        <input type="text" name="contact_id" placeholder="contact_id (GHL)">
+        <input type="text" name="contact_name" placeholder="Nombre del contacto">
+        <label>Contexto / diagnóstico del lead<textarea name="context" rows="2"></textarea></label>
+        <label>Mensaje <small>({setter} y {link} se rellenan solos)</small>
+          <textarea name="message" rows="5">{{ message_template }}</textarea>
+        </label>
+        <button type="submit" class="primary">Crear link trackeado</button>
+      </form>
+    </div>
+
+    <div class="side-card">
+      <h3>Links de este vídeo ({{ links|length }})</h3>
+      {% for l in links %}
+      <a class="mini-link" href="/links/{{ l.token }}">
+        <code>/r/{{ l.token }}</code>
+        <span class="{% if l.is_hot %}hot{% endif %}">{{ l.human_click_count }} clicks{% if l.is_hot %} 🔥{% endif %}</span>
+      </a>
+      {% else %}
+      <p class="muted small">Sin links todavía.</p>
+      {% endfor %}
+    </div>
+  </aside>
+</div>
+
+{% endblock %}

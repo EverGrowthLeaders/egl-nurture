@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Links trackeados · Biblioteca{% endblock %}
+{% block content %}
+
+<h1>Links trackeados</h1>
+
+{% if not links %}
+<p class="empty">Aún no has generado links. Ve a <a href="/recommend">Recomendar</a> o a la ficha de un vídeo.</p>
+{% else %}
+<table class="table">
+  <thead>
+    <tr><th>Token</th><th>Vídeo</th><th>Contacto</th><th>Enviado</th><th>Clicks</th><th>Estado</th></tr>
+  </thead>
+  <tbody>
+    {% for l in links %}
+    <tr>
+      <td><a href="/links/{{ l.token }}"><code>{{ l.token }}</code></a></td>
+      <td class="ellipsis">{{ l.video.title if l.video else l.video_id }}</td>
+      <td>{{ l.contact_name or l.contact_id or '—' }}{% if l.setter_name %} <span class="muted small">· {{ l.setter_name }}</span>{% endif %}</td>
+      <td class="muted">{{ l.sent_at|dt }}</td>
+      <td>{{ l.human_click_count }}<span class="muted"> / {{ l.click_count }}</span></td>
+      <td>{% if l.is_hot %}<span class="hot">🔥 caliente</span>{% else %}<span class="muted">sin click</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="hint small">Clicks: humanos / totales. Las previews de WhatsApp/Telegram/bots se cuentan en «totales» pero no marcan al lead como caliente.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="panel">
+  <h1>Biblioteca de vídeos</h1>
+  <form class="ingest" method="post" action="/ingest">
+    <input type="url" name="url" placeholder="Pega una URL de YouTube (https://youtu.be/...)" required>
+    <button type="submit">Ingerir vídeo</button>
+  </form>
+  <p class="hint">El sistema extrae metadata + transcripción, propone clasificación con DeepSeek y lo deja en revisión.</p>
+</section>
+
+<section class="filters">
+  <div class="tabs">
+    <a href="/" class="{% if not status %}on{% endif %}">Todos {% if counts %}({{ counts.values()|sum }}){% endif %}</a>
+    <a href="/?status=pending_review" class="{% if status == 'pending_review' %}on{% endif %}">En revisión ({{ counts.get('pending_review', 0) }})</a>
+    <a href="/?status=active" class="{% if status == 'active' %}on{% endif %}">Activos ({{ counts.get('active', 0) }})</a>
+    <a href="/?status=archived" class="{% if status == 'archived' %}on{% endif %}">Archivados ({{ counts.get('archived', 0) }})</a>
+  </div>
+  <form class="search" method="get" action="/">
+    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por título…">
+  </form>
+</section>
+
+{% if not videos %}
+  <p class="empty">No hay vídeos todavía. Pega una URL arriba para empezar.</p>
+{% else %}
+<div class="grid">
+  {% for v in videos %}
+  <a class="card" href="/videos/{{ v.id }}">
+    {% if v.thumbnail_url %}<img src="{{ v.thumbnail_url }}" alt="" loading="lazy">{% endif %}
+    <div class="card-body">
+      <span class="badge status-{{ v.status }}">{{ v.status.replace('_',' ') }}</span>
+      <h3>{{ v.title or v.youtube_video_id }}</h3>
+      <p class="muted">{{ v.summary or v.description[:140] }}</p>
+      <div class="tags">
+        {% if v.pain_category %}<span class="tag dolor">🎯 {{ v.pain_category }}</span>{% endif %}
+        {% if v.stage %}<span class="tag fase">{{ v.stage }}</span>{% endif %}
+        {% if not v.transcript %}<span class="tag muted-tag">sin transcripción</span>{% endif %}
+      </div>
+      <div class="meta">{{ v.duration_label }} · {{ v.approved_tags|length }} etiquetas aprobadas</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

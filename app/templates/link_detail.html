@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Link {{ link.token }} · Biblioteca{% endblock %}
+{% block content %}
+
+<a class="back" href="/links">← Links</a>
+
+<div class="link-detail">
+  <div class="side-card url-card">
+    <h2>Link trackeado {% if link.is_hot %}<span class="hot">🔥 lead caliente</span>{% endif %}</h2>
+    <div class="copy-row">
+      <input id="url" type="text" value="{{ url }}" readonly>
+      <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('url').value)">Copiar</button>
+    </div>
+    <div class="stats">
+      <div><b>{{ link.human_click_count }}</b><span>clicks humanos</span></div>
+      <div><b>{{ link.click_count }}</b><span>clicks totales</span></div>
+      <div><b>{{ link.first_clicked_at|dt }}</b><span>primer click</span></div>
+      <div><b>{{ link.last_clicked_at|dt }}</b><span>último click</span></div>
+    </div>
+  </div>
+
+  <div class="side-card">
+    <h3>Vídeo</h3>
+    <p><a href="/videos/{{ link.video.id }}">{{ link.video.title }}</a></p>
+    <p class="muted small">Redirige a: <a href="{{ link.video.youtube_url }}" target="_blank" rel="noopener">{{ link.video.youtube_url }}</a></p>
+    <h3>Contacto</h3>
+    <p class="muted">{{ link.contact_name or '—' }} {% if link.contact_id %}· <code>{{ link.contact_id }}</code>{% endif %}
+      {% if link.setter_name %}· habló con <b>{{ link.setter_name }}</b>{% endif %}</p>
+    {% if link.context %}<h3>Contexto del lead</h3><p class="muted">{{ link.context }}</p>{% endif %}
+  </div>
+
+  {% if link.message %}
+  <div class="side-card full">
+    <h3>Mensaje para enviar <small>(pégalo en GHL/Chatwoot)</small></h3>
+    <div class="copy-row">
+      <textarea id="msg" rows="4" readonly>{{ link.message }}</textarea>
+      <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('msg').value)">Copiar</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="side-card full">
+    <h3>Eventos de click ({{ clicks|length }})</h3>
+    {% if clicks %}
+    <table class="table">
+      <thead><tr><th>Cuándo</th><th>Tipo</th><th>User-Agent</th></tr></thead>
+      <tbody>
+        {% for c in clicks %}
+        <tr>
+          <td class="muted">{{ c.clicked_at|dt }}</td>
+          <td>{% if c.is_bot %}<span class="muted">bot/preview</span>{% else %}<span class="hot">humano</span>{% endif %}</td>
+          <td class="ellipsis muted small">{{ c.user_agent or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Sin clicks todavía.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

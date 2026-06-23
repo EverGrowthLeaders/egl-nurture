@@ -1,0 +1,45 @@
+# EGL Nurture Signal — docker-compose para Dokploy.
+# Dokploy inyecta las variables que definas en su sección "Environment".
+# Los ${VAR:-default} permiten correr también con `docker compose up` en local.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clasificador}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clasificador}
+      POSTGRES_DB: ${POSTGRES_DB:-clasificador}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clasificador} -d ${POSTGRES_DB:-clasificador}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-clasificador}:${POSTGRES_PASSWORD:-clasificador}@db:5432/${POSTGRES_DB:-clasificador}
+      DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY:-}
+      DEEPINFRA_MODEL: ${DEEPINFRA_MODEL:-deepseek-ai/DeepSeek-V3.2}
+      DEEPINFRA_BASE_URL: ${DEEPINFRA_BASE_URL:-https://api.deepinfra.com/v1/openai}
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      TRANSCRIPT_LANGS: ${TRANSCRIPT_LANGS:-es,en}
+      MESSAGE_TEMPLATE: ${MESSAGE_TEMPLATE:-}
+      DEFAULT_SETTER: ${DEFAULT_SETTER:-}
+      TRACKED_LINKS_IN_MESSAGE: ${TRACKED_LINKS_IN_MESSAGE:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+    # En Dokploy puedes quitar "ports" y asignar un dominio al servicio app
+    # (puerto 8000) desde la pestaña Domains; Traefik se encarga del enrutado.
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  db_data:

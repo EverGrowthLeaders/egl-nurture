@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Recomendar vídeo · Biblioteca{% endblock %}
+{% block content %}
+
+<section class="panel">
+  <h1>Prescripción de contenido</h1>
+  <p class="hint">Pega el diagnóstico del lead (lo que dijo en la llamada / chat). DeepSeek elige el vídeo activo que mejor ataca su dolor y redacta el mensaje.</p>
+  <form method="post" action="/recommend">
+    <textarea name="context" rows="4" placeholder="Ej: «Tenemos muchos leads pero el comercial tarda en contactar y se enfrían»" required>{{ context }}</textarea>
+    <button type="submit" class="primary">Recomendar vídeo</button>
+  </form>
+</section>
+
+{% if result %}
+<section class="reco">
+  <div class="reco-head">
+    <h2>Vídeo recomendado</h2>
+    <span class="badge conf">confianza {{ (result.confidence*100)|round|int }}%</span>
+  </div>
+
+  <div class="reco-card">
+    {% if result.video.thumbnail_url %}<img src="{{ result.video.thumbnail_url }}" alt="">{% endif %}
+    <div>
+      <h3><a href="/videos/{{ result.video.id }}">{{ result.video.title }}</a></h3>
+      <p class="muted">{{ result.video.summary }}</p>
+      <p class="why"><b>Por qué:</b> {{ result.reasoning }}</p>
+    </div>
+  </div>
+
+  <form method="post" action="/links" class="reco-send">
+    <input type="hidden" name="video_id" value="{{ result.video.id }}">
+    <input type="hidden" name="context" value="{{ context }}">
+    <div class="row">
+      <input type="text" name="setter_name" value="{{ default_setter }}" placeholder="Setter (p.ej. Laura)">
+      <input type="text" name="contact_id" placeholder="contact_id (GHL)">
+    </div>
+    <input type="text" name="contact_name" placeholder="Nombre del contacto (opcional)">
+    <label>Mensaje <small>({setter} y {link} se rellenan al generar; {link} =
+      {% if tracked_in_message %}link trackeado{% else %}URL directa de YouTube{% endif %})</small>
+      <textarea name="message" rows="5">{{ message_template }}</textarea>
+    </label>
+    <button type="submit" class="primary">Generar link trackeado para este lead</button>
+  </form>
+
+  {% if result.alternatives %}
+  <div class="alts">
+    <h4>Alternativas</h4>
+    {% for a in result.alternatives %}
+    <a class="alt" href="/videos/{{ a.id }}">{{ a.title }} <small>· {{ a.pain_category or '—' }}</small></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% endblock %}
