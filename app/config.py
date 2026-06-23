@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # DeepInfra / DeepSeek
     deepinfra_api_key: str = ""
-    deepinfra_model: str = "deepseek-ai/DeepSeek-V3.2"
+    deepinfra_model: str = "deepseek-ai/DeepSeek-V4-Flash"
     deepinfra_base_url: str = "https://api.deepinfra.com/v1/openai"
     request_timeout: int = 90
 

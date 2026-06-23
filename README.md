@@ -23,7 +23,9 @@ Revisión humana en el dashboard  →  ACTIVO                    [tú apruebas]
    ▼
 Lead concreto  →  DeepSeek elige vídeo + redacta mensaje
    ▼
-Link trackeado  /r/<token>  →  registra clicks (humano vs bot) → redirige a YouTube
+Link trackeado  /r/<token>?c=<contact_id>  →  página Open Graph (miniatura)
+                                            →  registra click (humano vs bot)
+                                            →  redirige a la URL/playlist de YouTube
 ```
 
 Stack: **FastAPI + SQLAlchemy + Jinja2**, **Postgres** (en producción), **DeepInfra** (OpenAI-compatible). Desplegable en **Dokploy** con `docker-compose.yml`.
@@ -49,7 +51,7 @@ Stack: **FastAPI + SQLAlchemy + Jinja2**, **Postgres** (en producción), **DeepI
    |---|---|
    | `POSTGRES_PASSWORD` | una contraseña fuerte |
    | `DEEPINFRA_API_KEY` | tu API key de DeepInfra |
-   | `DEEPINFRA_MODEL` | slug exacto del modelo, p.ej. `deepseek-ai/DeepSeek-V3.2` |
+   | `DEEPINFRA_MODEL` | slug exacto del modelo, por defecto `deepseek-ai/DeepSeek-V4-Flash` |
    | `BASE_URL` | el dominio público que asignes, p.ej. `https://video.tudominio.com` |
    | `SECRET_KEY` | cadena aleatoria (salt para hashear IPs) |
    | `ADMIN_TOKEN` | (opcional) protege los `POST /api/*` |
@@ -104,7 +106,8 @@ Sigue una **plantilla fija** (configurable en `MESSAGE_TEMPLATE`), por defecto:
 > Por lo que has hablado con "**{setter}**" y lo que has rellenado te paso este vídeo, que es muy importante que veas antes de la llamada, te va a ayudar a entender todo mejor: **{link}**
 
 - `{setter}` → el nombre que metes por lead (o `DEFAULT_SETTER`).
-- `{link}` → por defecto el **link trackeado** `/r/<token>` (que redirige a tu URL de playlist y registra el click). Con `TRACKED_LINKS_IN_MESSAGE=false` se usa la URL de YouTube directa (mejor preview en WhatsApp, pero sin tracking).
+- `{link}` → por defecto el **link trackeado** `/r/<token>?c=<contact_id>`. Ese link devuelve una página con etiquetas Open Graph (la miniatura del vídeo), así que **mantiene el preview en WhatsApp/Telegram a la vez que registra el click**, y luego redirige a tu URL de playlist. Con `TRACKED_LINKS_IN_MESSAGE=false` se usa la URL de YouTube directa (preview nativo, pero sin tracking).
+- **Contact ID en la URL:** el link lleva `?c=<contact_id>` (el de GHL). Al generarlo por lead se rellena solo; también puedes usar un link reutilizable y pasar el contacto con un merge field de GHL (`?c={{contact.id}}`) — el redirect lo lee y lo asocia al click.
 
 ---
 
@@ -145,7 +148,7 @@ curl -X POST https://tu-dominio/api/links \
 
 ## Notas
 
-- **Modelo DeepSeek:** verifica el slug exacto en la página del modelo en deepinfra.com y ponlo en `DEEPINFRA_MODEL`. Por defecto `deepseek-ai/DeepSeek-V3.2` (el más reciente a día de hoy). La app habla con el endpoint OpenAI-compatible `…/v1/openai/chat/completions`.
+- **Modelo DeepSeek:** por defecto `deepseek-ai/DeepSeek-V4-Flash` (rápido, MoE 284B/13B activos, contexto 1M). Verifica el slug exacto en la página del modelo en deepinfra.com y ponlo en `DEEPINFRA_MODEL`. La app habla con el endpoint OpenAI-compatible `…/v1/openai/chat/completions`.
 - **Transcripción:** es opcional en v1. Si YouTube no la expone (o limita la IP del servidor), el vídeo se clasifica igualmente con título + descripción. La transcripción se guarda en `content_videos.transcript` cuando está disponible.
 - **yt-dlp:** YouTube cambia su web a menudo. Si la ingesta empieza a fallar, actualiza la dependencia: en el contenedor reconstruye la imagen tras subir la versión de `yt-dlp` en `requirements.txt`.
 - **URL tal cual:** al ingerir, se guarda la URL exactamente como la pegas (incluido `&list=...`). Para metadata/dedup se extrae el ID del vídeo, pero el redirect `/r/<token>` lleva al lead a esa URL completa (playlist). Puedes editarla en la ficha del vídeo.

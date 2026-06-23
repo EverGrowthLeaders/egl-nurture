@@ -65,7 +65,7 @@ def video_to_dict(v: ContentVideo) -> dict:
 def link_to_dict(link: TrackedContentLink) -> dict:
     return {
         "token": link.token,
-        "url": links_service.build_url(link.token),
+        "url": links_service.build_url(link.token, link.contact_id),
         "redirect_url": link.video.youtube_url if link.video else None,
         "video_id": link.video_id,
         "setter_name": link.setter_name,

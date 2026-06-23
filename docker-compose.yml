@@ -23,7 +23,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-clasificador}:${POSTGRES_PASSWORD:-clasificador}@db:5432/${POSTGRES_DB:-clasificador}
       DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY:-}
-      DEEPINFRA_MODEL: ${DEEPINFRA_MODEL:-deepseek-ai/DeepSeek-V3.2}
+      DEEPINFRA_MODEL: ${DEEPINFRA_MODEL:-deepseek-ai/DeepSeek-V4-Flash}
       DEEPINFRA_BASE_URL: ${DEEPINFRA_BASE_URL:-https://api.deepinfra.com/v1/openai}
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}

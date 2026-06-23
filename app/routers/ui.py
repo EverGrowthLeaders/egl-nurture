@@ -250,5 +250,5 @@ def link_detail(token: str, request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "link_detail.html",
-        _ctx(request, link=link, clicks=clicks, url=links_service.build_url(link.token)),
+        _ctx(request, link=link, clicks=clicks, url=links_service.build_url(link.token, link.contact_id)),
     )

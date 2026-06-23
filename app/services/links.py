@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -49,8 +50,13 @@ def is_bot(user_agent: str | None) -> bool:
     return any(marker in low for marker in _BOT_MARKERS)
 
 
-def build_url(token: str) -> str:
-    return f"{settings.base_url.rstrip('/')}/r/{token}"
+def build_url(token: str, contact_id: str | None = None) -> str:
+    """URL trackeada. Si hay contact_id, va en la query (?c=...) para visibilidad
+    y atribución en GHL (también permite merge fields tipo ?c={{contact.id}})."""
+    url = f"{settings.base_url.rstrip('/')}/r/{token}"
+    if contact_id:
+        url += f"?c={quote(str(contact_id), safe='')}"
+    return url
 
 
 def render_message(template: str, *, setter: str, link_url: str, contact_name: str = "", pain: str = "") -> str:
@@ -86,8 +92,8 @@ def create_link(
     token = _new_token(db)
     setter = (setter_name or settings.default_setter or "").strip()
 
-    # El {link} del mensaje: trackeado (con redirect) o la URL directa de YouTube.
-    tracked_url = build_url(token)
+    # El {link} del mensaje: trackeado (con redirect + contact_id) o la URL directa.
+    tracked_url = build_url(token, contact_id)
     direct_url = video.youtube_url if video else tracked_url
     link_in_message = tracked_url if settings.tracked_links_in_message else direct_url
 
@@ -124,13 +130,22 @@ def record_click(
     user_agent: str | None,
     ip: str | None,
     referer: str | None,
+    contact_id: str | None = None,
 ) -> TrackedContentLink | None:
-    """Registra el click y devuelve el link (o None si el token no existe)."""
+    """Registra el click y devuelve el link (o None si el token no existe).
+
+    contact_id viene de la query ?c=... de la URL; si el link no tenía contacto
+    asociado (p.ej. link reutilizable con merge field de GHL), se asocia ahora.
+    """
     link = db.execute(
         select(TrackedContentLink).where(TrackedContentLink.token == token)
     ).scalar_one_or_none()
     if link is None:
         return None
+
+    if contact_id and not link.contact_id:
+        link.contact_id = contact_id
+    effective_contact = link.contact_id or contact_id
 
     bot = is_bot(user_agent)
     now = datetime.now(timezone.utc)
@@ -140,7 +155,7 @@ def record_click(
             link_id=link.id,
             token=token,
             video_id=link.video_id,
-            contact_id=link.contact_id,
+            contact_id=effective_contact,
             clicked_at=now,
             user_agent=(user_agent or "")[:512],
             referer=(referer or "")[:512] or None,
