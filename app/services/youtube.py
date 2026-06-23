@@ -1,6 +1,7 @@
 """Extracción de metadata y transcripción desde YouTube.
 
-- Metadata: yt-dlp (no requiere API key de Google).
+- Metadata: yt-dlp (no requiere API key de Google), con respaldo en oEmbed si
+  YouTube bloquea al servidor por "bot" (típico en IPs de datacenter como Dokploy).
 - Transcripción: youtube-transcript-api con respaldo en los subtítulos de yt-dlp.
 """
 
@@ -8,6 +9,10 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+
+import httpx
+
+from ..config import settings
 
 YOUTUBE_ID_RE = re.compile(
     r"""(?:
@@ -69,11 +74,27 @@ def fetch_metadata(url_or_id: str) -> dict:
         "no_warnings": True,
         "noplaylist": True,
     }
+    # Cookies para evitar el "Sign in to confirm you're not a bot" en servidores.
+    if settings.ytdlp_cookiefile:
+        opts["cookiefile"] = settings.ytdlp_cookiefile
+    if settings.ytdlp_player_client:
+        clients = [c.strip() for c in settings.ytdlp_player_client.split(",") if c.strip()]
+        opts["extractor_args"] = {"youtube": {"player_client": clients}}
+
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as err:  # noqa: BLE001 — yt-dlp lanza muchos tipos
-        raise YouTubeError(f"No se pudo obtener la información del vídeo: {err}") from err
+        # YouTube suele bloquear IPs de datacenter ("not a bot"): probamos oEmbed,
+        # un endpoint público que devuelve título, miniatura y canal sin login.
+        fallback = _fetch_metadata_oembed(video_id, url)
+        if fallback is not None:
+            return fallback
+        raise YouTubeError(
+            "No se pudo obtener la información del vídeo "
+            f"({err}). Si es un servidor, configura YTDLP_COOKIEFILE con un "
+            "cookies.txt de YouTube (ver README)."
+        ) from err
 
     return {
         "youtube_video_id": info.get("id", video_id),
@@ -88,6 +109,35 @@ def fetch_metadata(url_or_id: str) -> dict:
     }
 
 
+def _fetch_metadata_oembed(video_id: str, url: str) -> dict | None:
+    """Respaldo vía oEmbed de YouTube (público, sin login). Solo da título,
+    miniatura y canal; el resto queda vacío y se completa a mano/IA. None si falla."""
+    try:
+        resp = httpx.get(
+            "https://www.youtube.com/oembed",
+            params={"url": url, "format": "json"},
+            timeout=20,
+            follow_redirects=True,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+
+    return {
+        "youtube_video_id": video_id,
+        "youtube_url": url,
+        "title": data.get("title") or "",
+        "description": "",
+        "thumbnail_url": data.get("thumbnail_url")
+        or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+        "duration_seconds": None,
+        "channel_id": None,
+        "channel_name": data.get("author_name"),
+        "published_at": None,
+    }
+
+
 def fetch_transcript(video_id: str, langs: list[str]) -> tuple[str | None, str | None]:
     """Devuelve (texto, idioma) o (None, None) si no hay transcripción disponible.
 
@@ -98,9 +148,11 @@ def fetch_transcript(video_id: str, langs: list[str]) -> tuple[str | None, str |
     except ImportError:
         return None, None
 
+    cookies = settings.ytdlp_cookiefile or None
+
     # 1) Intento directo en los idiomas preferidos.
     try:
-        entries = YouTubeTranscriptApi.get_transcript(video_id, languages=langs)
+        entries = YouTubeTranscriptApi.get_transcript(video_id, languages=langs, cookies=cookies)
         text = " ".join(e["text"] for e in entries if e.get("text")).strip()
         if text:
             return text, langs[0]
@@ -110,7 +162,7 @@ def fetch_transcript(video_id: str, langs: list[str]) -> tuple[str | None, str |
     # 2) Cualquier transcripción disponible (manual o automática), con traducción
     #    al primer idioma preferido si es posible.
     try:
-        listing = YouTubeTranscriptApi.list_transcripts(video_id)
+        listing = YouTubeTranscriptApi.list_transcripts(video_id, cookies=cookies)
         for transcript in listing:
             try:
                 if transcript.language_code not in langs and transcript.is_translatable:

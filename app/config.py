@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Idiomas preferidos para la transcripción, en orden.
     transcript_langs: str = "es,en"
 
+    # yt-dlp: en servidores (IP de datacenter) YouTube pide "no soy un bot".
+    # Ruta a un cookies.txt de YouTube montado en el contenedor.
+    ytdlp_cookiefile: str = ""
+    # Clientes de player a probar (coma-separado), p.ej. "android,web,tv". Vacío = default.
+    ytdlp_player_client: str = ""
+
     # ── Mensaje al lead ──────────────────────────────────────────────
     # Plantilla del mensaje. Placeholders disponibles: {setter} {link}
     # {contact_name} {pain}. {link} se rellena con el link trackeado /r/<token>.

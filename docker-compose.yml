@@ -31,6 +31,13 @@ services:
       TRANSCRIPT_LANGS: ${TRANSCRIPT_LANGS:-es,en}
       MESSAGE_TEMPLATE: ${MESSAGE_TEMPLATE:-}
       DEFAULT_SETTER: ${DEFAULT_SETTER:-}
+      # Anti bot-check de YouTube en servidores (opcional, ver README):
+      YTDLP_COOKIEFILE: ${YTDLP_COOKIEFILE:-}
+      YTDLP_PLAYER_CLIENT: ${YTDLP_PLAYER_CLIENT:-}
+    # Para metadata + transcripción completas en el servidor, monta un cookies.txt
+    # de YouTube y pon YTDLP_COOKIEFILE=/cookies.txt en el Environment:
+    # volumes:
+    #   - ./cookies.txt:/cookies.txt:ro
     depends_on:
       db:
         condition: service_healthy

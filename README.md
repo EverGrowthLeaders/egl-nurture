@@ -150,6 +150,12 @@ curl -X POST https://tu-dominio/api/links \
 - **Modelo DeepSeek:** por defecto `deepseek-ai/DeepSeek-V4-Flash` (rápido, MoE 284B/13B activos, contexto 1M). Verifica el slug exacto en la página del modelo en deepinfra.com y ponlo en `DEEPINFRA_MODEL`. La app habla con el endpoint OpenAI-compatible `…/v1/openai/chat/completions`.
 - **Transcripción:** es opcional en v1. Si YouTube no la expone (o limita la IP del servidor), el vídeo se clasifica igualmente con título + descripción. La transcripción se guarda en `content_videos.transcript` cuando está disponible.
 - **yt-dlp:** YouTube cambia su web a menudo. Si la ingesta empieza a fallar, actualiza la dependencia: en el contenedor reconstruye la imagen tras subir la versión de `yt-dlp` en `requirements.txt`.
+- **"Sign in to confirm you're not a bot" (servidores):** YouTube bloquea las IPs de datacenter (como las de Dokploy). La app lo maneja así:
+  1. **Sin configurar nada**, si yt-dlp es bloqueado usa un respaldo vía **oEmbed** (endpoint público) y la ingesta funciona igual con **título + miniatura + canal**; descripción/duración/transcripción quedan vacías y las completas a mano o las propone la IA desde el título.
+  2. **Para metadata completa + transcripción**, dale cookies de una sesión de YouTube:
+     - Exporta un `cookies.txt` (formato Netscape) desde tu navegador con sesión iniciada (extensión "Get cookies.txt", o `yt-dlp --cookies-from-browser`).
+     - Móntalo en el contenedor (en `docker-compose.yml` hay un ejemplo de `volumes`) y pon `YTDLP_COOKIEFILE=/cookies.txt` en el Environment de Dokploy.
+     - Opcional: `YTDLP_PLAYER_CLIENT=android,web,tv` para probar otros clientes.
 - **URL tal cual:** al ingerir, se guarda la URL exactamente como la pegas (incluido `&list=...`). Para metadata/dedup se extrae el ID del vídeo, pero el redirect `/r/<token>` lleva al lead a esa URL completa (playlist). Puedes editarla en la ficha del vídeo.
 - **Mensaje:** sigue `MESSAGE_TEMPLATE` (placeholders `{setter} {link} {contact_name} {pain}`). Si borras `{link}` de la plantilla, el enlace se añade igualmente al final para no enviar un mensaje sin link.
 - **Clicks de bots/previews:** WhatsApp, Telegram, Slack, etc. precargan el link y generarían un "click" falso. Se registran como `is_bot=true` y **no** marcan al lead como caliente (`human_click_count`).
