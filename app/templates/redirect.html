@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
 
-  <!-- Open Graph: hace que WhatsApp/Telegram/etc. muestren la miniatura del vídeo -->
-  <meta property="og:type" content="video.other">
+  <!-- Open Graph: la miniatura YA lleva el play + marca de agua integrados, así que
+       usamos un card de imagen grande (website) para evitar un segundo botón de play. -->
+  <meta property="og:type" content="website">
   <meta property="og:site_name" content="YouTube">
   <meta property="og:title" content="{{ title }}">
   <meta property="og:description" content="{{ description }}">

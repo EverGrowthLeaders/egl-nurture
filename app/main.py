@@ -27,8 +27,9 @@ def healthz() -> dict:
 
 
 # Routers (se importan después de crear `templates` para evitar ciclos).
-from .routers import api, redirect, ui  # noqa: E402
+from .routers import api, preview, redirect, ui  # noqa: E402
 
 app.include_router(redirect.router)
+app.include_router(preview.router)
 app.include_router(api.router)
 app.include_router(ui.router)

@@ -123,7 +123,10 @@ Base: `https://tu-dominio`. Los `POST` mutantes exigen cabecera `X-Admin-Token` 
 | `POST` | `/api/videos/{id}/approve` | `{"approve_all_tags":true}` → activa el vídeo |
 | `POST` | `/api/recommend` | `{"context":"el lead dijo..."}` → vídeo + razonamiento + alternativas |
 | `POST` | `/api/links` | `{"video_id":2,"contact_id":"ghl_123","setter_name":"Laura","context":"..."}` → devuelve `url` trackeada, `redirect_url` y `message` final |
-| `GET` | `/r/{token}` | redirección pública que registra el click |
+| `GET` | `/api/links?contact_id=ghl_123&video_id=2` | ¿abrió el contacto el vídeo? Devuelve los links con `opened` (bool), clicks y timestamps |
+| `GET` | `/api/links/{token}` | estado de un link concreto (`opened`, clicks, fechas) |
+| `GET` | `/r/{token}` | redirección pública: preview tipo YouTube + registra el click |
+| `GET` | `/thumb/{youtube_id}.jpg` | miniatura compuesta (play + marca de agua YouTube) usada como `og:image` |
 
 Flujo típico por lead (p.ej. desde n8n / GHL):
 
@@ -141,6 +144,10 @@ curl -X POST https://tu-dominio/api/links \
 # → {"url":"https://tu-dominio/r/8e6RDPb",
 #    "redirect_url":"https://www.youtube.com/watch?v=...&list=...",
 #    "message":"Por lo que has hablado con \"Laura\" ... : https://tu-dominio/r/8e6RDPb"}
+
+# 3) (más tarde) ¿abrió el contacto el vídeo? → workflow en GHL
+curl "https://tu-dominio/api/links?contact_id=ghl_abc&video_id=2"
+# → [{"opened": true, "first_clicked_at": "...", "human_click_count": 1, ...}]
 ```
 
 ---
@@ -148,6 +155,7 @@ curl -X POST https://tu-dominio/api/links \
 ## Notas
 
 - **Modelo DeepSeek:** por defecto `deepseek-ai/DeepSeek-V4-Flash` (rápido, MoE 284B/13B activos, contexto 1M). Verifica el slug exacto en la página del modelo en deepinfra.com y ponlo en `DEEPINFRA_MODEL`. La app habla con el endpoint OpenAI-compatible `…/v1/openai/chat/completions`.
+- **Preview tipo YouTube:** el link `/r/<token>` expone como `og:image` una miniatura compuesta (`/thumb/<id>.jpg`) con el botón de play y la marca de agua "YouTube" ya integrados, para que en WhatsApp/Telegram se vea como un vídeo de YouTube real (las apps solo añaden ese aspecto a enlaces de `youtube.com`, no a dominios propios). Requiere que `BASE_URL` sea tu dominio público https. Las apps cachean el preview de forma agresiva: cada token nuevo genera una URL nueva, así que se ve fresco.
 - **Transcripción:** es opcional en v1. Si YouTube no la expone (o limita la IP del servidor), el vídeo se clasifica igualmente con título + descripción. La transcripción se guarda en `content_videos.transcript` cuando está disponible.
 - **yt-dlp:** YouTube cambia su web a menudo. Si la ingesta empieza a fallar, actualiza la dependencia: en el contenedor reconstruye la imagen tras subir la versión de `yt-dlp` en `requirements.txt`.
 - **"Sign in to confirm you're not a bot" (servidores):** YouTube bloquea las IPs de datacenter (como las de Dokploy). La app lo maneja así:

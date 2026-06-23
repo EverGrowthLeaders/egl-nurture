@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm import selectinload
+
 from ..auth import require_admin
 from ..db import get_db
-from ..models import STATUS_ACTIVE, ContentVideo
+from ..models import STATUS_ACTIVE, ContentVideo, TrackedContentLink
 from ..schemas import (
     ApproveRequest,
     CreateLinkRequest,
@@ -79,6 +81,39 @@ def recommend(body: RecommendRequest, db: Session = Depends(get_db)) -> dict:
         "confidence": result["confidence"],
         "alternatives": [video_to_dict(v) for v in result["alternatives"]],
     }
+
+
+@router.get("/links")
+def list_links(
+    contact_id: str | None = None,
+    video_id: int | None = None,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Lista links (filtrables por contact_id y/o video_id). Útil para que GHL
+    consulte si un contacto abrió el vídeo que se le envió."""
+    stmt = (
+        select(TrackedContentLink)
+        .order_by(TrackedContentLink.created_at.desc())
+        .options(selectinload(TrackedContentLink.video))
+    )
+    if contact_id:
+        stmt = stmt.where(TrackedContentLink.contact_id == contact_id)
+    if video_id is not None:
+        stmt = stmt.where(TrackedContentLink.video_id == video_id)
+    return [link_to_dict(link) for link in db.execute(stmt).scalars().all()]
+
+
+@router.get("/links/{token}")
+def get_link(token: str, db: Session = Depends(get_db)) -> dict:
+    """Estado de un link: opened (¿lo abrió un humano?), clicks y timestamps."""
+    link = db.execute(
+        select(TrackedContentLink)
+        .where(TrackedContentLink.token == token)
+        .options(selectinload(TrackedContentLink.video))
+    ).scalar_one_or_none()
+    if not link:
+        raise HTTPException(404, "Link no encontrado")
+    return link_to_dict(link)
 
 
 @router.post("/links", dependencies=[Depends(require_admin)])

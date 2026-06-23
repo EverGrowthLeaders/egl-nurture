@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import get_db
 from ..services import links
 from ..templating import templates
@@ -24,10 +25,9 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-def _thumbnail(video) -> str:
-    if video.thumbnail_url:
-        return video.thumbnail_url
-    return f"https://i.ytimg.com/vi/{video.youtube_video_id}/hqdefault.jpg"
+def _preview_image(video) -> str:
+    # Miniatura compuesta (play + marca de agua YouTube) servida por /thumb/<id>.jpg.
+    return f"{settings.base_url.rstrip('/')}/thumb/{video.youtube_video_id}.jpg"
 
 
 @router.get("/r/{token}", include_in_schema=False)
@@ -57,7 +57,7 @@ def follow_link(
             "request": request,
             "title": video.title or "Vídeo",
             "description": description,
-            "image": _thumbnail(video),
+            "image": _preview_image(video),
             "target": video.youtube_url,
         },
     )
