@@ -26,7 +26,7 @@ def recommend(db: Session, lead_context: str) -> dict:
     Resultado:
       {
         "video": ContentVideo,
-        "reasoning": str, "message": str, "confidence": float,
+        "reasoning": str, "confidence": float,
         "alternatives": [ContentVideo, ...],
         "lead_context": str,
       }
@@ -55,7 +55,6 @@ def recommend(db: Session, lead_context: str) -> dict:
     return {
         "video": chosen,
         "reasoning": result["reasoning"],
-        "message": result["message"],
         "confidence": result["confidence"],
         "alternatives": alternatives,
         "lead_context": lead_context,

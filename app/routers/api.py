@@ -76,7 +76,6 @@ def recommend(body: RecommendRequest, db: Session = Depends(get_db)) -> dict:
     return {
         "video": video_to_dict(result["video"]),
         "reasoning": result["reasoning"],
-        "message": result["message"],
         "confidence": result["confidence"],
         "alternatives": [video_to_dict(v) for v in result["alternatives"]],
     }

@@ -57,7 +57,6 @@ Stack: **FastAPI + SQLAlchemy + Jinja2**, **Postgres** (en producción), **DeepI
    | `ADMIN_TOKEN` | (opcional) protege los `POST /api/*` |
    | `DEFAULT_SETTER` | (opcional) nombre del setter por defecto en el mensaje |
    | `MESSAGE_TEMPLATE` | (opcional) plantilla del mensaje; placeholders `{setter} {link} {contact_name} {pain}` |
-   | `TRACKED_LINKS_IN_MESSAGE` | `true` (link `/r/<token>` con tracking) o `false` (URL de YouTube directa) |
 
    > El `docker-compose.yml` construye `DATABASE_URL` solo a partir de `POSTGRES_USER/PASSWORD/DB` y levanta su **propio Postgres** con volumen persistente. No necesitas una base de datos externa.
 
@@ -106,7 +105,7 @@ Sigue una **plantilla fija** (configurable en `MESSAGE_TEMPLATE`), por defecto:
 > Por lo que has hablado con "**{setter}**" y lo que has rellenado te paso este vídeo, que es muy importante que veas antes de la llamada, te va a ayudar a entender todo mejor: **{link}**
 
 - `{setter}` → el nombre que metes por lead (o `DEFAULT_SETTER`).
-- `{link}` → por defecto el **link trackeado** `/r/<token>?c=<contact_id>`. Ese link devuelve una página con etiquetas Open Graph (la miniatura del vídeo), así que **mantiene el preview en WhatsApp/Telegram a la vez que registra el click**, y luego redirige a tu URL de playlist. Con `TRACKED_LINKS_IN_MESSAGE=false` se usa la URL de YouTube directa (preview nativo, pero sin tracking).
+- `{link}` → el **link trackeado** `/r/<token>?c=<contact_id>`. Ese link devuelve una página con etiquetas Open Graph (la miniatura del vídeo), así que **mantiene el preview en WhatsApp/Telegram a la vez que registra el click**, y luego redirige a tu URL de playlist.
 - **Contact ID en la URL:** el link lleva `?c=<contact_id>` (el de GHL). Al generarlo por lead se rellena solo; también puedes usar un link reutilizable y pasar el contacto con un merge field de GHL (`?c={{contact.id}}`) — el redirect lo lee y lo asocia al click.
 
 ---
@@ -153,7 +152,7 @@ curl -X POST https://tu-dominio/api/links \
 - **yt-dlp:** YouTube cambia su web a menudo. Si la ingesta empieza a fallar, actualiza la dependencia: en el contenedor reconstruye la imagen tras subir la versión de `yt-dlp` en `requirements.txt`.
 - **URL tal cual:** al ingerir, se guarda la URL exactamente como la pegas (incluido `&list=...`). Para metadata/dedup se extrae el ID del vídeo, pero el redirect `/r/<token>` lleva al lead a esa URL completa (playlist). Puedes editarla en la ficha del vídeo.
 - **Mensaje:** sigue `MESSAGE_TEMPLATE` (placeholders `{setter} {link} {contact_name} {pain}`). Si borras `{link}` de la plantilla, el enlace se añade igualmente al final para no enviar un mensaje sin link.
-- **Clicks de bots/previews:** WhatsApp, Telegram, Slack, etc. precargan el link y generarían un "click" falso. Se registran como `is_bot=true` y **no** marcan al lead como caliente (`human_click_count`). *(Solo aplica si usas el link trackeado; con `TRACKED_LINKS_IN_MESSAGE=false` no hay tracking.)*
+- **Clicks de bots/previews:** WhatsApp, Telegram, Slack, etc. precargan el link y generarían un "click" falso. Se registran como `is_bot=true` y **no** marcan al lead como caliente (`human_click_count`).
 - **Migraciones:** v1 crea las tablas con `create_all` al arrancar. Para cambios de esquema en producción conviene añadir Alembic.
 
 ---

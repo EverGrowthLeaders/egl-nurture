@@ -92,10 +92,9 @@ def create_link(
     token = _new_token(db)
     setter = (setter_name or settings.default_setter or "").strip()
 
-    # El {link} del mensaje: trackeado (con redirect + contact_id) o la URL directa.
-    tracked_url = build_url(token, contact_id)
-    direct_url = video.youtube_url if video else tracked_url
-    link_in_message = tracked_url if settings.tracked_links_in_message else direct_url
+    # El {link} del mensaje: siempre el link trackeado (redirect + contact_id),
+    # que mantiene el preview de la miniatura y registra el click.
+    link_in_message = build_url(token, contact_id)
 
     template = message if message is not None else settings.message_template
     final_message = render_message(

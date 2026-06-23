@@ -35,8 +35,7 @@
       <input type="text" name="contact_id" placeholder="contact_id (GHL)">
     </div>
     <input type="text" name="contact_name" placeholder="Nombre del contacto (opcional)">
-    <label>Mensaje <small>({setter} y {link} se rellenan al generar; {link} =
-      {% if tracked_in_message %}link trackeado{% else %}URL directa de YouTube{% endif %})</small>
+    <label>Mensaje <small>({setter} y {link} se rellenan al generar; {link} = link trackeado con preview)</small>
       <textarea name="message" rows="5">{{ message_template }}</textarea>
     </label>
     <button type="submit" class="primary">Generar link trackeado para este lead</button>

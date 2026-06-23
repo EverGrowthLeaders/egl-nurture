@@ -31,7 +31,6 @@ services:
       TRANSCRIPT_LANGS: ${TRANSCRIPT_LANGS:-es,en}
       MESSAGE_TEMPLATE: ${MESSAGE_TEMPLATE:-}
       DEFAULT_SETTER: ${DEFAULT_SETTER:-}
-      TRACKED_LINKS_IN_MESSAGE: ${TRACKED_LINKS_IN_MESSAGE:-true}
     depends_on:
       db:
         condition: service_healthy

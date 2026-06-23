@@ -37,13 +37,10 @@ class Settings(BaseSettings):
 
     # ── Mensaje al lead ──────────────────────────────────────────────
     # Plantilla del mensaje. Placeholders disponibles: {setter} {link}
-    # {contact_name} {pain}. {link} se rellena con el link trackeado (o la
-    # URL directa de YouTube si tracked_links_in_message=False).
+    # {contact_name} {pain}. {link} se rellena con el link trackeado /r/<token>.
     message_template: str = DEFAULT_MESSAGE_TEMPLATE
     # Nombre del setter/closer por defecto (se puede sobreescribir por lead).
     default_setter: str = ""
-    # True: el mensaje lleva /r/<token> (con tracking). False: la URL de YouTube directa.
-    tracked_links_in_message: bool = True
 
     @field_validator("message_template")
     @classmethod

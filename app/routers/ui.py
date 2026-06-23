@@ -36,7 +36,6 @@ def _ctx(request: Request, **kwargs) -> dict:
         "err": request.query_params.get("err"),
         "message_template": settings.message_template,
         "default_setter": settings.default_setter,
-        "tracked_in_message": settings.tracked_links_in_message,
     }
     base.update(kwargs)
     return base

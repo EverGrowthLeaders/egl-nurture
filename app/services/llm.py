@@ -41,8 +41,6 @@ Devuelve:
 {
   "video_id": <id entero del vídeo elegido>,
   "reasoning": "por qué este vídeo encaja con el dolor del lead (1-2 frases)",
-  "message": "mensaje breve y personalizado para enviar al lead (tono cercano, sin sonar \
-a plantilla, máx 4 frases, sin incluir el link)",
   "confidence": 0.0-1.0,
   "alternatives": [<ids de 0-2 vídeos alternativos>]
 }
@@ -190,7 +188,6 @@ def _normalize_recommendation(data: dict, candidates: list[dict]) -> dict:
     return {
         "video_id": vid,
         "reasoning": str(data.get("reasoning", "")).strip(),
-        "message": str(data.get("message", "")).strip(),
         "confidence": max(0.0, min(conf, 1.0)),
         "alternatives": alts[:2],
     }
@@ -245,11 +242,6 @@ def _mock_recommend(lead_context: str, candidates: list[dict]) -> dict:
     return {
         "video_id": best["id"],
         "reasoning": f"[DEMO] El lead refleja el dolor «{pain}» y este vídeo es el más cercano por título/etiquetas.",
-        "message": (
-            f"[DEMO] Hola, por lo que me cuentas ({pain}) creo que esto te va a resonar mucho. "
-            "Te dejo un vídeo corto donde lo explico con un caso parecido al tuyo. "
-            "Cuando lo veas me dices qué te parece 👇"
-        ),
         "confidence": 0.4,
         "alternatives": alts,
     }
