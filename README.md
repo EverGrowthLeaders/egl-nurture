@@ -53,19 +53,34 @@ Stack: **FastAPI + SQLAlchemy + Jinja2**, **Postgres** (en producción), **DeepI
    | `DEEPINFRA_API_KEY` | tu API key de DeepInfra |
    | `DEEPINFRA_MODEL` | slug exacto del modelo, por defecto `deepseek-ai/DeepSeek-V4-Flash` |
    | `BASE_URL` | el dominio público que asignes, p.ej. `https://video.tudominio.com` |
-   | `SECRET_KEY` | cadena aleatoria (salt para hashear IPs) |
-   | `ADMIN_TOKEN` | (opcional) protege los `POST /api/*` |
-   | `DEFAULT_SETTER` | (opcional) nombre del setter por defecto en el mensaje |
-   | `MESSAGE_TEMPLATE` | (opcional) plantilla del mensaje; placeholders `{setter} {link} {contact_name} {pain}` |
+   | `SECRET_KEY` | cadena aleatoria (firma la sesión de login y hashea IPs) |
+   | `BOOTSTRAP_ADMIN_EMAIL` | email de la primera cuenta (se crea al arrancar) |
+   | `BOOTSTRAP_ADMIN_PASSWORD` | contraseña de esa cuenta |
+   | `BOOTSTRAP_TENANT_NAME` | (opcional) nombre del workspace, p.ej. `EGL` |
 
    > El `docker-compose.yml` construye `DATABASE_URL` solo a partir de `POSTGRES_USER/PASSWORD/DB` y levanta su **propio Postgres** con volumen persistente. No necesitas una base de datos externa.
 
 3. **Asigna un dominio** al servicio `app` (puerto **8000**) desde la pestaña *Domains* de Dokploy. Traefik enruta el tráfico; puedes borrar la sección `ports` del compose si usas solo el dominio.
-4. **Deploy.** Al arrancar, la app crea las tablas y siembra el vocabulario de etiquetas automáticamente.
+4. **Deploy.** Al arrancar, la app migra/crea las tablas, crea tu cuenta (si pusiste `BOOTSTRAP_*`) y reasigna los datos previos a tu workspace.
 
 > ⚠️ **Importante:** pon `BASE_URL` igual al dominio público real, porque es lo que se usa para construir los links `/r/<token>` que envías a los leads.
 
-> 🔒 El dashboard web (`/`, `/recommend`, `/links`) **no** lleva login. Protégelo a nivel de Dokploy/Traefik (Basic Auth) o detrás de tu red. `ADMIN_TOKEN` solo protege la API JSON.
+### Cuentas (multi-tenant, invite-only)
+
+Cada **cuenta = un workspace (tenant)** con sus vídeos, links y settings aislados. No hay registro abierto: las cuentas se crean con `BOOTSTRAP_*` (la primera) o por CLI:
+
+```bash
+# dentro del contenedor app (Dokploy → Terminal del servicio)
+python -m app.admin create-tenant --name "Cliente X" --email cliente@x.com --password secreto
+python -m app.admin list
+python -m app.admin set-password --email cliente@x.com --password nueva
+```
+
+Entras por `/login`. En **Settings** cada usuario configura su setter por defecto, su plantilla de mensaje, su conexión a GHL y su API key.
+
+### Integración GoHighLevel
+
+En **Settings** pegas tu **Private Integration Token** (API v2) y tu **Location ID**; el sistema lista tus *custom fields* y eliges en cuál escribir. Cuando un lead **ve el vídeo** (click humano), el software escribe ese campo en el contacto (`contact_id`) formateando el valor según el tipo de campo: `DATE` → fecha, `CHECKBOX`/opciones → "Sí", numérico → 1, texto → "Visto {fecha}" (o el valor que fijes).
 
 ---
 
@@ -112,7 +127,7 @@ Sigue una **plantilla fija** (configurable en `MESSAGE_TEMPLATE`), por defecto:
 
 ## API JSON (para n8n / GHL / Chatwoot)
 
-Base: `https://tu-dominio`. Los `POST` mutantes exigen cabecera `X-Admin-Token` **si** definiste `ADMIN_TOKEN`.
+Base: `https://tu-dominio`. **Todas** las llamadas a `/api/*` exigen la cabecera `X-Api-Key` con la API key de tu workspace (la ves en Settings). Cada key resuelve su tenant y aísla los datos.
 
 | Método | Ruta | Cuerpo / notas |
 |---|---|---|
@@ -133,20 +148,21 @@ Flujo típico por lead (p.ej. desde n8n / GHL):
 ```bash
 # 1) DeepSeek elige el vídeo según el diagnóstico del lead
 curl -X POST https://tu-dominio/api/recommend \
-  -H 'content-type: application/json' \
+  -H 'X-Api-Key: TU_API_KEY' -H 'content-type: application/json' \
   -d '{"context":"Agendan pero no aparecen a la llamada"}'
 # → {"video": {"id": 2, ...}, ...}
 
 # 2) Generas el link + mensaje para ese lead (contact_id de GHL + setter)
 curl -X POST https://tu-dominio/api/links \
-  -H 'content-type: application/json' \
+  -H 'X-Api-Key: TU_API_KEY' -H 'content-type: application/json' \
   -d '{"video_id":2,"contact_id":"ghl_abc","setter_name":"Laura"}'
 # → {"url":"https://tu-dominio/r/8e6RDPb",
 #    "redirect_url":"https://www.youtube.com/watch?v=...&list=...",
 #    "message":"Por lo que has hablado con \"Laura\" ... : https://tu-dominio/r/8e6RDPb"}
 
 # 3) (más tarde) ¿abrió el contacto el vídeo? → workflow en GHL
-curl "https://tu-dominio/api/links?contact_id=ghl_abc&video_id=2"
+#    (al abrirlo, además, se escribe el campo elegido en el contacto de GHL)
+curl -H 'X-Api-Key: TU_API_KEY' "https://tu-dominio/api/links?contact_id=ghl_abc&video_id=2"
 # → [{"opened": true, "first_clicked_at": "...", "human_click_count": 1, ...}]
 ```
 
@@ -165,9 +181,9 @@ curl "https://tu-dominio/api/links?contact_id=ghl_abc&video_id=2"
      - Móntalo en el contenedor (en `docker-compose.yml` hay un ejemplo de `volumes`) y pon `YTDLP_COOKIEFILE=/cookies.txt` en el Environment de Dokploy.
      - Opcional: `YTDLP_PLAYER_CLIENT=android,web,tv` para probar otros clientes.
 - **URL tal cual:** al ingerir, se guarda la URL exactamente como la pegas (incluido `&list=...`). Para metadata/dedup se extrae el ID del vídeo, pero el redirect `/r/<token>` lleva al lead a esa URL completa (playlist). Puedes editarla en la ficha del vídeo.
-- **Mensaje:** sigue `MESSAGE_TEMPLATE` (placeholders `{setter} {link} {contact_name} {pain}`). Si borras `{link}` de la plantilla, el enlace se añade igualmente al final para no enviar un mensaje sin link.
-- **Clicks de bots/previews:** WhatsApp, Telegram, Slack, etc. precargan el link y generarían un "click" falso. Se registran como `is_bot=true` y **no** marcan al lead como caliente (`human_click_count`).
-- **Migraciones:** v1 crea las tablas con `create_all` al arrancar. Para cambios de esquema en producción conviene añadir Alembic.
+- **Mensaje:** sigue la plantilla del tenant (Settings; placeholders `{setter} {link} {contact_name} {pain}`). Si borras `{link}`, el enlace se añade igualmente al final para no enviar un mensaje sin link.
+- **Clicks de bots/previews:** WhatsApp, Telegram, Slack, etc. precargan el link y generarían un "click" falso. Se registran como `is_bot=true` y **no** marcan al lead como caliente (`human_click_count`) ni disparan la escritura en GHL.
+- **Migraciones:** al arrancar se crean las tablas nuevas y se añade `tenant_id` a las existentes (migración ligera, idempotente), reasignando los datos previos a tu workspace. Para esquemas más complejos conviene añadir Alembic.
 
 ---
 
@@ -175,25 +191,33 @@ curl "https://tu-dominio/api/links?contact_id=ghl_abc&video_id=2"
 
 ```
 app/
-  main.py            # FastAPI + lifespan (init DB)
-  config.py          # settings desde entorno
-  db.py              # engine + sesión (Postgres/SQLite)
-  models.py          # las 5 tablas
-  seed.py            # vocabulario de etiquetas
+  main.py            # FastAPI + sesión + lifespan (init/migración DB)
+  config.py          # settings globales (DB, DeepInfra, BASE_URL, bootstrap)
+  db.py              # engine + sesión + migración ligera (Postgres/SQLite)
+  models.py          # Tenant, User + las 5 tablas (scoped por tenant)
+  bootstrap.py       # crea tenant/usuario inicial + backfill de datos previos
+  security.py        # hashing de contraseñas (PBKDF2) + api keys
+  auth.py            # sesión de login + X-Api-Key por tenant
+  admin.py           # CLI: crear cuentas (python -m app.admin)
+  seed.py            # vocabulario de etiquetas (por tenant)
   demo.py            # datos de demo (python -m app.demo)
   schemas.py         # esquemas API
-  auth.py            # X-Admin-Token
   templating.py      # Jinja2 compartido
   services/
-    youtube.py       # yt-dlp + youtube-transcript-api
+    youtube.py       # yt-dlp (+ oEmbed) + youtube-transcript-api
     llm.py           # DeepInfra/DeepSeek + modo demo
     ingest.py        # orquesta la ingesta
     recommend.py     # prescripción de vídeo
     links.py         # tokens + tracking de clicks
+    thumbnail.py     # miniatura estilo YouTube (Pillow)
+    ghl.py           # GoHighLevel v2 (campos + escritura type-aware)
   routers/
-    api.py           # API JSON
+    account.py       # login / logout
+    settings.py      # Settings del tenant (setter, plantilla, GHL)
+    api.py           # API JSON (X-Api-Key)
     ui.py            # dashboard
-    redirect.py      # /r/{token}
+    redirect.py      # /r/{token} (preview + tracking + GHL)
+    preview.py       # /thumb/{id}.jpg
   templates/  static/
 Dockerfile  docker-compose.yml  requirements.txt  .env.example
 ```

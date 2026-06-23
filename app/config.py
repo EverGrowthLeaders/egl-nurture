@@ -2,7 +2,6 @@
 
 from functools import lru_cache
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_MESSAGE_TEMPLATE = (
@@ -28,9 +27,13 @@ class Settings(BaseSettings):
     # URL pública usada para construir los links trackeados (/r/<token>).
     base_url: str = "http://localhost:8000"
 
-    # Seguridad
+    # Seguridad / sesiones (firma la cookie de login y hashea IPs).
     secret_key: str = "dev-secret-change-me"
-    admin_token: str = ""
+
+    # Bootstrap opcional de la primera cuenta al arrancar (cómodo en Dokploy).
+    bootstrap_admin_email: str = ""
+    bootstrap_admin_password: str = ""
+    bootstrap_tenant_name: str = "EGL"
 
     # Idiomas preferidos para la transcripción, en orden.
     transcript_langs: str = "es,en"
@@ -41,18 +44,8 @@ class Settings(BaseSettings):
     # Clientes de player a probar (coma-separado), p.ej. "android,web,tv". Vacío = default.
     ytdlp_player_client: str = ""
 
-    # ── Mensaje al lead ──────────────────────────────────────────────
-    # Plantilla del mensaje. Placeholders disponibles: {setter} {link}
-    # {contact_name} {pain}. {link} se rellena con el link trackeado /r/<token>.
-    message_template: str = DEFAULT_MESSAGE_TEMPLATE
-    # Nombre del setter/closer por defecto (se puede sobreescribir por lead).
-    default_setter: str = ""
-
-    @field_validator("message_template")
-    @classmethod
-    def _fallback_template(cls, v: str) -> str:
-        # Si el entorno pasa un valor vacío (p.ej. ${MESSAGE_TEMPLATE:-}), usa el default.
-        return v if (v and v.strip()) else DEFAULT_MESSAGE_TEMPLATE
+    # Nota: el setter por defecto y la plantilla de mensaje ahora son POR TENANT
+    # (se editan en Settings). DEFAULT_MESSAGE_TEMPLATE es solo el valor inicial.
 
     @property
     def langs(self) -> list[str]:

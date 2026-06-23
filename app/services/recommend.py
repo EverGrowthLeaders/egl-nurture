@@ -20,7 +20,7 @@ def _candidate_dict(video: ContentVideo) -> dict:
     }
 
 
-def recommend(db: Session, lead_context: str) -> dict:
+def recommend(db: Session, tenant_id: int, lead_context: str) -> dict:
     """Devuelve la recomendación + el objeto de vídeo elegido y sus alternativas.
 
     Resultado:
@@ -34,7 +34,10 @@ def recommend(db: Session, lead_context: str) -> dict:
     videos = (
         db.execute(
             select(ContentVideo)
-            .where(ContentVideo.status == STATUS_ACTIVE)
+            .where(
+                ContentVideo.tenant_id == tenant_id,
+                ContentVideo.status == STATUS_ACTIVE,
+            )
             .options(selectinload(ContentVideo.tags))
         )
         .scalars()

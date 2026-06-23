@@ -27,7 +27,10 @@ services:
       DEEPINFRA_BASE_URL: ${DEEPINFRA_BASE_URL:-https://api.deepinfra.com/v1/openai}
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
-      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      # Crea la primera cuenta al arrancar (multi-tenant, login invite-only):
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_TENANT_NAME: ${BOOTSTRAP_TENANT_NAME:-EGL}
       TRANSCRIPT_LANGS: ${TRANSCRIPT_LANGS:-es,en}
       MESSAGE_TEMPLATE: ${MESSAGE_TEMPLATE:-}
       DEFAULT_SETTER: ${DEFAULT_SETTER:-}

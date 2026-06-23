@@ -20,7 +20,7 @@ class CreateLinkRequest(BaseModel):
     video_id: int
     context: str = ""  # diagnóstico / dolor del lead
     setter_name: str | None = None  # con quién habló el lead (p.ej. "Laura")
-    # Si se omite, se usa la plantilla por defecto (settings.message_template).
+    # Si se omite, se usa la plantilla del tenant (Settings).
     # Acepta placeholders {setter} {link} {contact_name} {pain}.
     message: str | None = None
     contact_id: str | None = None

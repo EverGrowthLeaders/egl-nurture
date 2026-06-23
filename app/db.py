@@ -52,12 +52,32 @@ def wait_for_db(retries: int = 20, delay: float = 1.5) -> None:
     raise RuntimeError(f"No se pudo conectar a la base de datos: {last_err}")
 
 
+def _add_missing_columns() -> None:
+    """Migración ligera: añade tenant_id a tablas que ya existían (pre multi-tenant).
+
+    create_all() no altera tablas existentes, así que añadimos la columna a mano.
+    Idempotente y compatible con Postgres y SQLite.
+    """
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    tables = ("content_videos", "content_tags", "tracked_content_links", "content_click_events")
+    with engine.begin() as conn:
+        for table in tables:
+            if not insp.has_table(table):
+                continue
+            existing = {c["name"] for c in insp.get_columns(table)}
+            if "tenant_id" not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER"))
+
+
 def init_db() -> None:
-    """Crea las tablas y siembra el vocabulario de etiquetas comerciales."""
+    """Crea/migra tablas, asegura un tenant para los datos previos y siembra etiquetas."""
     from . import models  # noqa: F401  (registra los modelos en Base.metadata)
-    from .seed import seed_tags
+    from .bootstrap import bootstrap
 
     wait_for_db()
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)  # crea tenants/users y tablas nuevas
+    _add_missing_columns()                  # añade tenant_id a tablas antiguas
     with SessionLocal() as db:
-        seed_tags(db)
+        bootstrap(db)

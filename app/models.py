@@ -14,11 +14,17 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from .config import DEFAULT_MESSAGE_TEMPLATE
 from .db import Base
 
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _tenant_fk() -> Mapped[int | None]:
+    # nullable para facilitar la migración/backfill; en código siempre se rellena.
+    return mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=True)
 
 
 # Estados del vídeo dentro del flujo "IA propone → tú apruebas → activo".
@@ -35,11 +41,58 @@ SOURCE_LLM = "llm_suggested"
 SOURCE_AUTO = "auto"
 
 
-class ContentVideo(Base):
-    __tablename__ = "content_videos"
+class Tenant(Base):
+    """Una cuenta/workspace. Aísla datos y guarda los settings del usuario."""
+
+    __tablename__ = "tenants"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    youtube_video_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    api_key: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    # Settings comerciales (antes en .env, ahora por tenant).
+    default_setter: Mapped[str] = mapped_column(String(128), default="")
+    message_template: Mapped[str] = mapped_column(Text, default=DEFAULT_MESSAGE_TEMPLATE)
+
+    # Integración GoHighLevel (API v2 / LeadConnector).
+    ghl_token: Mapped[str] = mapped_column(Text, default="")  # Private Integration Token
+    ghl_location_id: Mapped[str] = mapped_column(String(64), default="")
+    ghl_field_id: Mapped[str] = mapped_column(String(64), default="")  # custom field elegido
+    ghl_field_name: Mapped[str] = mapped_column(String(255), default="")
+    ghl_field_type: Mapped[str] = mapped_column(String(32), default="")  # dataType de GHL
+    ghl_field_value: Mapped[str] = mapped_column(String(255), default="")  # override opcional del valor
+
+    users: Mapped[list["User"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+
+    @property
+    def ghl_ready(self) -> bool:
+        return bool(self.ghl_token and self.ghl_location_id and self.ghl_field_id)
+
+
+class User(Base):
+    """Usuario que inicia sesión. Pertenece a un tenant."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    tenant: Mapped["Tenant"] = relationship(back_populates="users")
+
+
+class ContentVideo(Base):
+    __tablename__ = "content_videos"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "youtube_video_id", name="uq_video_tenant_ytid"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int | None] = _tenant_fk()
+    youtube_video_id: Mapped[str] = mapped_column(String(32), index=True)
     youtube_url: Mapped[str] = mapped_column(String(512))
     title: Mapped[str] = mapped_column(String(512), default="")
     description: Mapped[str] = mapped_column(Text, default="")
@@ -86,9 +139,10 @@ class ContentVideo(Base):
 
 class ContentTag(Base):
     __tablename__ = "content_tags"
-    __table_args__ = (UniqueConstraint("name", "type", name="uq_tag_name_type"),)
+    __table_args__ = (UniqueConstraint("tenant_id", "name", "type", name="uq_tag_tenant_name_type"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int | None] = _tenant_fk()
     name: Mapped[str] = mapped_column(String(128), index=True)
     type: Mapped[str] = mapped_column(String(32), index=True)  # dolor | fase | objecion
 
@@ -118,6 +172,7 @@ class TrackedContentLink(Base):
     __tablename__ = "tracked_content_links"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int | None] = _tenant_fk()
     token: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("content_videos.id", ondelete="CASCADE"))
 
@@ -154,6 +209,7 @@ class ContentClickEvent(Base):
     __tablename__ = "content_click_events"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int | None] = _tenant_fk()
     link_id: Mapped[int] = mapped_column(ForeignKey("tracked_content_links.id", ondelete="CASCADE"))
     token: Mapped[str] = mapped_column(String(32), index=True)
     video_id: Mapped[int] = mapped_column(Integer, index=True)

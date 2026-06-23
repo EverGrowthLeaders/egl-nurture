@@ -20,23 +20,29 @@ class IngestError(Exception):
     pass
 
 
-def _tag_vocabulary(db: Session) -> list[str]:
-    tags = db.execute(select(ContentTag)).scalars().all()
+def _tag_vocabulary(db: Session, tenant_id: int) -> list[str]:
+    tags = db.execute(
+        select(ContentTag).where(ContentTag.tenant_id == tenant_id)
+    ).scalars().all()
     return [t.label for t in tags]
 
 
-def _get_or_create_tag(db: Session, name: str, ttype: str) -> ContentTag:
+def _get_or_create_tag(db: Session, tenant_id: int, name: str, ttype: str) -> ContentTag:
     tag = db.execute(
-        select(ContentTag).where(ContentTag.name == name, ContentTag.type == ttype)
+        select(ContentTag).where(
+            ContentTag.tenant_id == tenant_id,
+            ContentTag.name == name,
+            ContentTag.type == ttype,
+        )
     ).scalar_one_or_none()
     if tag is None:
-        tag = ContentTag(name=name, type=ttype)
+        tag = ContentTag(tenant_id=tenant_id, name=name, type=ttype)
         db.add(tag)
         db.flush()
     return tag
 
 
-def ingest_video(db: Session, url_or_id: str) -> ContentVideo:
+def ingest_video(db: Session, tenant_id: int, url_or_id: str) -> ContentVideo:
     """Ingesta (o devuelve si ya existía) un vídeo de YouTube y lo deja en revisión."""
     video_id = youtube.extract_video_id(url_or_id)
     if not video_id:
@@ -47,7 +53,10 @@ def ingest_video(db: Session, url_or_id: str) -> ContentVideo:
     redirect_url = youtube.redirect_url_for(url_or_id, video_id)
 
     existing = db.execute(
-        select(ContentVideo).where(ContentVideo.youtube_video_id == video_id)
+        select(ContentVideo).where(
+            ContentVideo.tenant_id == tenant_id,
+            ContentVideo.youtube_video_id == video_id,
+        )
     ).scalar_one_or_none()
     if existing is not None:
         # Si re-pegas el mismo vídeo con una URL (p.ej. ahora con playlist), se actualiza.
@@ -68,11 +77,12 @@ def ingest_video(db: Session, url_or_id: str) -> ContentVideo:
         title=meta["title"],
         description=meta["description"],
         transcript=transcript,
-        tag_vocabulary=_tag_vocabulary(db),
+        tag_vocabulary=_tag_vocabulary(db, tenant_id),
     )
 
     # 4) Persistir
     video = ContentVideo(
+        tenant_id=tenant_id,
         youtube_video_id=meta["youtube_video_id"],
         youtube_url=redirect_url,  # tal cual lo pegó el usuario (puede llevar &list=...)
         title=meta["title"],
@@ -94,7 +104,7 @@ def ingest_video(db: Session, url_or_id: str) -> ContentVideo:
     db.flush()
 
     for t in classification["tags"]:
-        tag = _get_or_create_tag(db, t["name"], t["type"])
+        tag = _get_or_create_tag(db, tenant_id, t["name"], t["type"])
         db.add(
             VideoTag(
                 video_id=video.id,

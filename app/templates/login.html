@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · EGL Nurture Signal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-brand">📡 EGL Nurture Signal</div>
+      <p class="muted small" style="margin-top:-.4rem">Inicia sesión en tu workspace</p>
+      {% if err %}<div class="flash error">{{ err }}</div>{% endif %}
+      <form method="post" action="/login">
+        <label>Email<input type="email" name="email" required autofocus></label>
+        <label>Contraseña<input type="password" name="password" required></label>
+        <button class="primary" type="submit" style="width:100%">Entrar</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

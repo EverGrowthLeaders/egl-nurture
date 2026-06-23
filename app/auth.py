@@ -1,19 +1,43 @@
-"""Autenticación mínima para los endpoints /api/* mutantes."""
+"""Autenticación: sesión de usuario (UI) y API key por tenant (API)."""
 
-from fastapi import Header, HTTPException, status
+from __future__ import annotations
 
-from .config import settings
+from fastapi import Depends, Header, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from .db import get_db
+from .models import Tenant, User
 
 
-def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
-    """Si ADMIN_TOKEN está definido, exige la cabecera X-Admin-Token correcta.
+class NotAuthenticated(Exception):
+    """La lanza la UI para redirigir a /login."""
 
-    Si no está definido (desarrollo), no exige nada.
-    """
-    if not settings.admin_token:
-        return
-    if x_admin_token != settings.admin_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="X-Admin-Token inválido o ausente.",
-        )
+
+def current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    uid = request.session.get("uid")
+    if not uid:
+        raise NotAuthenticated()
+    user = db.get(User, uid)
+    if user is None:
+        request.session.clear()
+        raise NotAuthenticated()
+    return user
+
+
+def current_tenant(user: User = Depends(current_user)) -> Tenant:
+    return user.tenant
+
+
+def api_tenant(
+    x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)
+) -> Tenant:
+    """Resuelve el tenant a partir de la cabecera X-Api-Key (para la API)."""
+    if not x_api_key:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Falta la cabecera X-Api-Key")
+    tenant = db.execute(
+        select(Tenant).where(Tenant.api_key == x_api_key)
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "X-Api-Key inválida")
+    return tenant

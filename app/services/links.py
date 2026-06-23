@@ -78,6 +78,7 @@ def render_message(template: str, *, setter: str, link_url: str, contact_name: s
 def create_link(
     db: Session,
     *,
+    tenant,
     video_id: int,
     message: str | None = None,
     context: str = "",
@@ -90,13 +91,13 @@ def create_link(
     """Crea el link único y construye el mensaje final (plantilla → texto con enlace)."""
     video = db.get(ContentVideo, video_id)
     token = _new_token(db)
-    setter = (setter_name or settings.default_setter or "").strip()
+    setter = (setter_name or tenant.default_setter or "").strip()
 
     # El {link} del mensaje: siempre el link trackeado (redirect + contact_id),
     # que mantiene el preview de la miniatura y registra el click.
     link_in_message = build_url(token, contact_id)
 
-    template = message if message is not None else settings.message_template
+    template = message if message is not None else tenant.message_template
     final_message = render_message(
         template,
         setter=setter,
@@ -106,6 +107,7 @@ def create_link(
     )
 
     link = TrackedContentLink(
+        tenant_id=tenant.id,
         token=token,
         video_id=video_id,
         message=final_message,
@@ -151,6 +153,7 @@ def record_click(
 
     db.add(
         ContentClickEvent(
+            tenant_id=link.tenant_id,
             link_id=link.id,
             token=token,
             video_id=link.video_id,

@@ -29,15 +29,18 @@ SEED_TAGS: list[tuple[str, str]] = [
 ]
 
 
-def seed_tags(db: Session) -> int:
-    """Inserta las etiquetas que falten. Idempotente."""
+def seed_tags(db: Session, tenant_id: int) -> int:
+    """Inserta las etiquetas que falten para un tenant. Idempotente."""
     existing = {
-        (t.type, t.name) for t in db.execute(select(ContentTag)).scalars().all()
+        (t.type, t.name)
+        for t in db.execute(
+            select(ContentTag).where(ContentTag.tenant_id == tenant_id)
+        ).scalars().all()
     }
     created = 0
     for tag_type, name in SEED_TAGS:
         if (tag_type, name) not in existing:
-            db.add(ContentTag(type=tag_type, name=name))
+            db.add(ContentTag(tenant_id=tenant_id, type=tag_type, name=name))
             created += 1
     if created:
         db.commit()

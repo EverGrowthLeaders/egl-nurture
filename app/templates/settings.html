@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Settings · EGL Nurture Signal{% endblock %}
+{% block content %}
+
+<h1>Settings</h1>
+<p class="hint">Workspace: <b>{{ tenant.name }}</b></p>
+
+<form method="post" action="/settings">
+  <section class="panel">
+    <h2>Mensaje</h2>
+    <label>Setter por defecto
+      <input type="text" name="default_setter" value="{{ tenant.default_setter }}" placeholder="p.ej. Laura">
+    </label>
+    <label>Plantilla del mensaje <small>(placeholders: {setter} {link} {contact_name} {pain})</small>
+      <textarea name="message_template" rows="4">{{ tenant.message_template }}</textarea>
+    </label>
+  </section>
+
+  <section class="panel">
+    <h2>Integración GoHighLevel</h2>
+    <p class="hint">API v2 (LeadConnector): pega tu <b>Private Integration Token</b> y tu <b>Location ID</b>. Guarda y vuelve aquí para elegir el campo.</p>
+    {% if ghl_error %}<div class="flash error">GHL: {{ ghl_error }}</div>{% endif %}
+    <div class="row">
+      <label>Private Integration Token
+        <input type="password" name="ghl_token" value="{{ tenant.ghl_token }}" placeholder="pit-...">
+      </label>
+      <label>Location ID
+        <input type="text" name="ghl_location_id" value="{{ tenant.ghl_location_id }}" placeholder="abcdEFGH...">
+      </label>
+    </div>
+
+    <label>Campo a escribir cuando el lead ve el vídeo
+      {% if fields %}
+      <select name="ghl_field_id">
+        <option value="">— No escribir en GHL —</option>
+        {% for f in fields %}
+        <option value="{{ f.id }}" {% if f.id == tenant.ghl_field_id %}selected{% endif %}>{{ f.name }} · {{ f.dataType }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <input type="text" name="ghl_field_id" value="{{ tenant.ghl_field_id }}" placeholder="Guarda token + location para listar campos">
+      {% endif %}
+    </label>
+    {% if tenant.ghl_field_id %}
+    <p class="hint small">Campo actual: <b>{{ tenant.ghl_field_name or tenant.ghl_field_id }}</b>
+      {% if tenant.ghl_field_type %}<span class="tag fase">{{ tenant.ghl_field_type }}</span>{% endif %}</p>
+    {% endif %}
+
+    <label>Valor a escribir <small>(opcional; por defecto el software elige según el tipo: fecha para DATE, "Sí"/"Visto" para texto/opciones, 1 para numérico)</small>
+      <input type="text" name="ghl_field_value" value="{{ tenant.ghl_field_value }}" placeholder="(automático según el tipo)">
+    </label>
+  </section>
+
+  <button type="submit" class="primary">Guardar settings</button>
+</form>
+
+<section class="panel" style="margin-top:1.4rem">
+  <h2>API</h2>
+  <p class="hint">Usa esta API key en tus automatizaciones (n8n / GHL) con la cabecera <code>X-Api-Key</code>.</p>
+  <div class="copy-row">
+    <input id="apikey" type="text" value="{{ tenant.api_key }}" readonly>
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('apikey').value)">Copiar</button>
+  </div>
+  <p class="hint small">Base URL: <code>{{ base_url }}</code> · Ejemplo: <code>GET {{ base_url }}/api/links?contact_id=...</code></p>
+</section>
+
+{% endblock %}
