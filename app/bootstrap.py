@@ -59,13 +59,14 @@ def bootstrap(db: Session) -> None:
             )
 
     # 2) Datos previos sin tenant → asignarlos a un tenant por defecto.
+    #    (El backfill va ANTES de sembrar etiquetas, para que seed_tags vea las
+    #    etiquetas ya existentes y no intente duplicarlas.)
     if _has_orphan_rows(db):
         default = db.execute(select(Tenant).order_by(Tenant.id)).scalars().first()
         if default is None:
             default = Tenant(name="Default", api_key=new_api_key())
             db.add(default)
             db.flush()
-            seed_tags(db, default.id)
         for model in _SCOPED:
             db.execute(
                 update(model).where(model.tenant_id.is_(None)).values(tenant_id=default.id)

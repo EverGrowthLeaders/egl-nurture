@@ -53,9 +53,10 @@ def wait_for_db(retries: int = 20, delay: float = 1.5) -> None:
 
 
 def _add_missing_columns() -> None:
-    """Migración ligera: añade tenant_id a tablas que ya existían (pre multi-tenant).
+    """Migración ligera: añade tenant_id a tablas previas y elimina constraints
+    únicos antiguos (globales) que ahora deben ser por-tenant.
 
-    create_all() no altera tablas existentes, así que añadimos la columna a mano.
+    create_all() no altera tablas existentes, así que lo hacemos a mano.
     Idempotente y compatible con Postgres y SQLite.
     """
     from sqlalchemy import inspect, text
@@ -69,6 +70,20 @@ def _add_missing_columns() -> None:
             existing = {c["name"] for c in insp.get_columns(table)}
             if "tenant_id" not in existing:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER"))
+
+    # Constraints únicos heredados (pre multi-tenant) que impiden repetir
+    # etiqueta/vídeo entre tenants. Solo Postgres; SQLite no los tiene con ese nombre.
+    if not settings.database_url.startswith("sqlite"):
+        legacy = [
+            ("content_tags", "uq_tag_name_type"),
+            ("content_videos", "content_videos_youtube_video_id_key"),
+        ]
+        with engine.begin() as conn:
+            for table, constraint in legacy:
+                if insp.has_table(table):
+                    conn.execute(
+                        text(f'ALTER TABLE {table} DROP CONSTRAINT IF EXISTS "{constraint}"')
+                    )
 
 
 def init_db() -> None:
