@@ -48,9 +48,26 @@ def list_custom_fields(token: str, location_id: str) -> list[dict]:
                 "name": f.get("name") or f.get("fieldKey") or f.get("id"),
                 "dataType": (f.get("dataType") or f.get("type") or "TEXT").upper(),
                 "fieldKey": f.get("fieldKey", ""),
+                "options": _options(f),
             }
         )
     return out
+
+
+# Tipos de campo que aceptan un valor de una lista cerrada (no texto libre).
+OPTION_TYPES = ("SINGLE_OPTIONS", "MULTIPLE_OPTIONS", "RADIO", "CHECKBOX")
+
+
+def _options(field: dict) -> list[str]:
+    """Normaliza las opciones de un custom field a lista de strings."""
+    raw = field.get("picklistOptions") or field.get("options") or []
+    out = []
+    for o in raw:
+        if isinstance(o, dict):
+            out.append(str(o.get("value") or o.get("label") or o.get("name") or "").strip())
+        else:
+            out.append(str(o).strip())
+    return [o for o in out if o]
 
 
 def format_value(data_type: str, override: str = "") -> object:
