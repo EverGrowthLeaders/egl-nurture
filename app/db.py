@@ -84,6 +84,16 @@ def _add_missing_columns() -> None:
                     conn.execute(
                         text(f'ALTER TABLE {table} DROP CONSTRAINT IF EXISTS "{constraint}"')
                     )
+            # El índice ÚNICO heredado sobre youtube_video_id impide repetir un
+            # vídeo entre tenants. Lo cambiamos por un índice normal (no único).
+            if insp.has_table("content_videos"):
+                conn.execute(text('DROP INDEX IF EXISTS ix_content_videos_youtube_video_id'))
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_content_videos_youtube_video_id "
+                        "ON content_videos (youtube_video_id)"
+                    )
+                )
 
 
 def init_db() -> None:

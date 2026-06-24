@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -101,20 +102,34 @@ def ingest_video(db: Session, tenant_id: int, url_or_id: str) -> ContentVideo:
         status=STATUS_PENDING,
     )
     db.add(video)
-    db.flush()
-
-    for t in classification["tags"]:
-        tag = _get_or_create_tag(db, tenant_id, t["name"], t["type"])
-        db.add(
-            VideoTag(
-                video_id=video.id,
-                tag_id=tag.id,
-                confidence=t["confidence"],
-                source=SOURCE_LLM,
-                approved=False,  # la persona aprueba en el dashboard
+    try:
+        db.flush()
+        for t in classification["tags"]:
+            tag = _get_or_create_tag(db, tenant_id, t["name"], t["type"])
+            db.add(
+                VideoTag(
+                    video_id=video.id,
+                    tag_id=tag.id,
+                    confidence=t["confidence"],
+                    source=SOURCE_LLM,
+                    approved=False,  # la persona aprueba en el dashboard
+                )
             )
+        db.commit()
+    except IntegrityError:
+        # Conflicto (p.ej. índice único heredado o carrera): no rompemos con un 500.
+        db.rollback()
+        again = db.execute(
+            select(ContentVideo).where(
+                ContentVideo.tenant_id == tenant_id,
+                ContentVideo.youtube_video_id == video_id,
+            )
+        ).scalar_one_or_none()
+        if again is not None:
+            return again
+        raise IngestError(
+            "No se pudo guardar el vídeo por un conflicto en la base de datos. "
+            "Si persiste, vuelve a desplegar para aplicar la migración."
         )
-
-    db.commit()
     db.refresh(video)
     return video
